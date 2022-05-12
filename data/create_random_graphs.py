@@ -105,7 +105,7 @@ def adjacency_gen(nnodes, undirected = False):
 #         results.append(w_pth)
 #     return results
 
-def assign_weights(n, shortest_path):
+def assign_weights(G, n, shortest_path):
     wt_matrix = np.zeros((n, n))
 
     # we assign high weights to edges that are in the shortest path
@@ -119,10 +119,10 @@ def assign_weights(n, shortest_path):
     # we assign really low weights to edges that are not in shortest path
     for i in range(n):
         for j in range(n):
-            if wt_matrix[i, j] == 0:
+            if wt_matrix[i, j] == 0 and G[i, j] == 1:
                 wt = random.randint(0, 10)
                 wt_matrix[i, j] = wt
-                wt_matrix[j, i] = wt
+                wt_matrix[j, i] = wt 
 
     return wt_matrix
 
@@ -148,7 +148,7 @@ def main():
     shortest_path, shortest_distance = fetch_shortest_path(G, source, destination, len(G))
     if shortest_path:
         print("Shortest Path: {}\nDistance: {}".format(shortest_path, shortest_distance))
-        flow_matrix = assign_weights(n, shortest_path)
+        flow_matrix = assign_weights(G, n, shortest_path)
     else:
         print("path does not exist")
 
