@@ -89,21 +89,6 @@ def adjacency_gen(nnodes, undirected = False):
     return adj
 
 
-# def path_gen(paths, weighted=False):
-#     results = []
-#     for pth in paths:
-#         print(pth)
-#         w_pth = []
-#         if weighted:
-#             weights = np.random.uniform(low=5.0, high=15.0, size=(len(pth) - 1,))
-#             for i in range(len(pth) - 1):
-#                 w_pth.append([pth[i], pth[i + 1], int(weights[i])])
-#         else:
-#             for i in range(len(pth) - 1):
-#                 w_pth.append([pth[i], pth[i + 1], 1])
-#
-#         results.append(w_pth)
-#     return results
 
 def assign_weights(G, n, shortest_path):
     wt_matrix = np.zeros((n, n))
@@ -122,7 +107,7 @@ def assign_weights(G, n, shortest_path):
             if wt_matrix[i, j] == 0 and G[i, j] == 1:
                 wt = random.randint(0, 10)
                 wt_matrix[i, j] = wt
-                wt_matrix[j, i] = wt 
+                wt_matrix[j, i] = wt
 
     return wt_matrix
 
@@ -148,7 +133,16 @@ def main():
     shortest_path, shortest_distance = fetch_shortest_path(G, source, destination, len(G))
     if shortest_path:
         print("Shortest Path: {}\nDistance: {}".format(shortest_path, shortest_distance))
-        flow_matrix = assign_weights(G, n, shortest_path)
+        '''
+            Currently we assume that there will only be 1 dominant flow
+            The assign weights function always assigns random weights to each edge, while making sure that all the edges
+            in the shortest path recieve maximum weight.
+        '''
+        flow_matrices = []
+        index = 0
+        while index < 50:
+            flow_matrix = assign_weights(G, n, shortest_path)
+            flow_matrices.append(flow_matrix)
     else:
         print("path does not exist")
 
