@@ -173,12 +173,20 @@ def generate_adj_matrix_for_edge_graph(new_node_positions, new_node_ids):
                     edges.append([source_id, dest_id])
 
             index2 += 1
-
     #filling adjacency matrix
     for edge in edges:
         adj[edge[0], edge[1]] = 1
         adj[edge[1], edge[0]] = 1
 
+    # should we fill all edges both forward and backward?
+    # all_edges = []
+    # for edge in edges:
+    #     all_edges.append(edge)
+    #     if [edge[1], edge[0]] not in edges:
+    #         all_edges.append([edge[1], edge[0]])
+    # import IPython
+    # IPython.embed()
+    # assert False
     return adj, edges
 
 
