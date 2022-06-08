@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import random
 import networkx.generators.random_graphs as nxrg
 from itertools import *
@@ -93,25 +94,56 @@ def adjacency_gen(nnodes, undirected = False):
 
 
 def assign_weights(G, n, shortest_path):
-    wt_matrix = np.zeros((n, n))
 
+    wt_matrix = np.zeros((n, n))
+    unique_edges = []
+    edge_weights = []
+    main_edges = []
+    all_edges = []
     # we assign high weights to edges that are in the shortest path
     for i in range(len(shortest_path)-1):
 
         wt = random.randint(50, 60)
         wt_matrix[shortest_path[i],shortest_path[i+1]] = wt
         wt_matrix[shortest_path[i+1], shortest_path[i]] = wt
+        unique_edges.append([shortest_path[i], shortest_path[i + 1]])
+        main_edges.append([shortest_path[i], shortest_path[i + 1]])
+        #unique_edges.append([shortest_path[i+1], shortest_path[i]])
+        edge_weights.append(wt)
+        #edge_weights.append(wt)
         #print("{},{}, {}".format(shortest_path[i], shortest_path[i + 1], wt))
 
     # we assign really low weights to edges that are not in shortest path
+
+
     for i in range(n):
         for j in range(n):
             if wt_matrix[i, j] == 0 and G[i, j] == 1:
-                wt = random.randint(0, 10)
+
+                wt = random.randint(1, 10)
                 wt_matrix[i, j] = wt
                 wt_matrix[j, i] = wt
+                unique_edges.append([i, j])
+                #unique_edges.append([j, i])
+                edge_weights.append(wt)
+                #edge_weights.append(wt)
+    sources = [str(edge[0]) for edge in unique_edges]
+    destinations = [str(edge[1]) for edge in unique_edges]
+    node_graph_features = pd.DataFrame(
+        {
+            "source": sources,
+            "target": destinations,
+            "weight": edge_weights,
+        }
+    )
 
-    return wt_matrix
+    for source in range(len(G)):
+        for destination in range(len(G)):
+            if G[source, destination] == 1:
+                if [source, destination] in unique_edges:
+                    all_edges.append([source, destination])
+
+    return wt_matrix, node_graph_features, main_edges, all_edges
 
 def make_double_directed(G):
     for i in range(len(G)):
@@ -178,20 +210,21 @@ def generate_adj_matrix_for_edge_graph(new_node_positions, new_node_ids):
         adj[edge[0], edge[1]] = 1
         adj[edge[1], edge[0]] = 1
 
-    # should we fill all edges both forward and backward?
-    # all_edges = []
-    # for edge in edges:
-    #     all_edges.append(edge)
-    #     if [edge[1], edge[0]] not in edges:
-    #         all_edges.append([edge[1], edge[0]])
-    # import IPython
-    # IPython.embed()
-    # assert False
+
     return adj, edges
 
 
+def generate_output(main_edges, all_edges):
+    output = []
+    for i in all_edges:
+        if i in main_edges:
+            output.append(1)
+        else:
+            output.append(0)
+    output = np.array(output)
+    return output
 
-def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_features, node_id_pos_dict):
+def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_features, node_id_pos_dict, node_graph_features, main_edges, all_edges):
     '''
 
     :param counter: it just stores the iteration name(for writing the data)
@@ -205,7 +238,9 @@ def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_fe
     :return: nothing
     '''
 
-    output_dir = "{}/{}/".format(os.getcwd(), "dataset")
+    output_list = generate_output(main_edges,all_edges)
+    #output_dir = "{}/{}/".format(os.getcwd(), "dataset_50_and_different_dominant_path")
+    output_dir = "{}/{}/".format(os.getcwd(), "dataset_100_nodes_same_dominant_path/")
     #checking if dataset directory exist, if not create it
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
@@ -217,13 +252,19 @@ def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_fe
         print("created directory: {}".format(output_dir))
 
     # writing node_graph_adjacency_list
+    # import IPython
+    # IPython.embed()
+    # assert False
     nx.write_adjlist(g_object, "{}{}".format(output_dir, "node_graph.adjlist"))
 
+    np.save("{}output".format(output_dir), output_list)
+    np.save("{}main_edges".format(output_dir), main_edges)
+    np.save("{}all_edges".format(output_dir), all_edges)
     # writing edge graph adjacency list
     edge_graph_obj =  nx.from_numpy_matrix(edge_graph_adj)
 
     edge_graph_obj.add_edges_from(edge_graph_features["edges"])
-    nx.write_adjlist(edge_graph_obj, "{}{}".format(output_dir, "node_graph.adjlist"))
+    nx.write_adjlist(edge_graph_obj, "{}{}".format(output_dir, "edge_graph.adjlist"))
 
     # with open("{}node_graph_flow.json".format(output_dir), "w") as my_file:
     #     import IPython
@@ -236,8 +277,11 @@ def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_fe
         json.dump(node_id_pos_dict, my_file)
 
     # writing features of the edge graph
-    with open("{}features.json".format(output_dir), "w") as my_file:
+    with open("{}edge_graph_features.json".format(output_dir), "w") as my_file:
         json.dump(edge_graph_features, my_file)
+    with open("{}node_graph_features.json".format(output_dir), "w") as my_file:
+        data = node_graph_features.to_json()
+        json.dump(data, my_file)
 
     #storing graph images for better understanding
     #edge_graph_obj = nx.Graph()
@@ -250,12 +294,12 @@ def write_data(counter, g_object, edge_graph_adj, node_graph_flow, edge_graph_fe
     plt.clf()
     print("written to {}".format(output_dir))
 
-def create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, coutner):
+def create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, coutner, node_graph_features,main_edges, all_edges):
+    #print("create_edge_matrix_from_weighted_node_matrix")
     total_number_of_nodes = 0
     new_node_positions = []
     weight_for_nodes = []
     #node_weights = []
-
     #coverting node graph to edge graph
     for source in range(len(G)):
         for destination in range(len(G)):
@@ -272,28 +316,54 @@ def create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, coutn
                     weight_for_nodes.append(flow_matrix[source, destination])
     #assigning node id for edge graph
     new_node_ids = [i for i in range(len(new_node_positions))]
+
     adj, edges = generate_adj_matrix_for_edge_graph(new_node_positions, new_node_ids)
     node_id_pos_dict = {new_node_ids[node_id]: new_node_positions[node_id] for node_id in new_node_ids}
     edge_graph_node_features = {str(node_id):weight_for_nodes[node_id] for node_id in new_node_ids }
     edge_graph_features = {"edges": edges, "features":edge_graph_node_features}
 
-    write_data(coutner, g_object, adj, flow_matrix, edge_graph_features, node_id_pos_dict)
-
-    # import IPython
-    # IPython.embed()
-    # assert False
+    write_data(coutner, g_object, adj, flow_matrix, edge_graph_features, node_id_pos_dict, node_graph_features,main_edges, all_edges)
 
 
+def create_dataset_for_different_dominant_path():
+    n = 50
+    g_object = gnp_random_connected_graph(n, 0.02)
+    G = nx.adjacency_matrix(g_object).toarray()
+    print("Total Edges: {}".format(len(g_object.edges)))
+    index = 0
+    while index < 100:
+        source = random.randint(0, n - 1)
+        # generating random number excluding source
+        destination = random.choice([node_id for node_id in range(n) if node_id not in [source]])
+        shortest_path, shortest_distance = fetch_shortest_path(G, source, destination, len(G))
+        print("Source: {}, Destination: {}, Shortest Path: {}, Distance: {}".format(source, destination, shortest_path, shortest_distance))
+        if len(shortest_path) > 2:
+            flow_matrix, node_graph_features, main_edges, all_edges = assign_weights(G, n, shortest_path)
+            #flow_matrices.append(flow_matrix)
+            create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, index, node_graph_features,
+                                                         main_edges, all_edges)
+            index += 1
+        else:
+            continue
 
 
+    source = random.randint(0, n - 1)
+    destination = random.choice([node_id for node_id in range(n) if node_id not in [source]])
 def main():
+    create_dataset_for_different_dominant_path()
+    import IPython
+    IPython.embed()
+    assert False
+    #output_dir =
     #creating a bidirected graph with 50 nodes
-    n = 10
+    n = 100
     # graph_obj = nxrg.barabasi_albert_graph(n, 2)
     # G = nx.adjacency_matrix(graph_obj).toarray()
-    g_object = gnp_random_connected_graph(n, 0.1)
+    g_object = gnp_random_connected_graph(n, 0.01)
     # edge_list = [[edge[0], edge[1]] for edge in list(G.edges)]
     G = nx.adjacency_matrix(g_object).toarray()
+    print("Total Edges: {}".format(len(g_object.edges)))
+    edge_map = {}
 
     source = random.randint(0, n-1)
     #generating random number excluding source
@@ -310,11 +380,11 @@ def main():
         '''
         flow_matrices = []
         index = 0
-        while index < 50:
+        while index < 100:
             # print(index)
-            flow_matrix = assign_weights(G, n, shortest_path)
+            flow_matrix, node_graph_features, main_edges, all_edges = assign_weights(G, n, shortest_path)
             flow_matrices.append(flow_matrix)
-            create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, index)
+            create_edge_matrix_from_weighted_node_matrix(G, g_object, flow_matrix, index, node_graph_features,main_edges,all_edges)
             index += 1
     else:
         print("path does not exist")
